@@ -341,11 +341,13 @@ class MainWindow(Ui_Form, qtw.QWidget):
         brush = qtg.QBrush()
         brush.setStyle(qtc.Qt.BDiagPattern)
         #self.drawRigidSurface(5,5,45,15, pen=self.penMed,brush=brush)
-        self.pivot = self.drawPivot(-100,0,10,20)
+        self.pivot0 = self.drawPivot(-100, 0, 10, 20)
         self.pivot1 = self.drawPivot(60,-30,10,20)
+        self.link0=self.drawLinkage(self.pivot0.x, self.pivot0.y, self.pivot1.x, self.pivot1.y, radius=5, pen = self.penGridLines, brush = self.brushGrid)
         self.link1=self.drawLinkage(-100,0,-100,-60,5)
         self.link2=self.drawLinkage(-100,-60, 100, -80, 5)
         self.link3=self.drawLinkage(60,-30,100,-80,5)
+
         #self.link2=self.drawLinkage(5,-5,-55,-60,10, self.penLink)
 
         #draw some lines
@@ -489,9 +491,10 @@ class MainWindow(Ui_Form, qtw.QWidget):
 
         self.drawARectangle(left, top, Width, Height, pen=penOutline, brush=brush)
 
-    def drawLinkage(self, stX, stY, enX, enY, radius=10, pen=None):
+    def drawLinkage(self, stX, stY, enX, enY, radius=10, pen=None, brush=None):
         if pen is None: pen=self.penLink
-        lin1=RigidLink(stX, stY, enX, enY, radius, pen=pen, brush=self.brushLink)
+        if brush is None: brush=self.brushLink
+        lin1=RigidLink(stX, stY, enX, enY, radius, pen=pen, brush=brush)
         self.scene.addItem(lin1)
         return lin1
     def drawPivot(self, x, y, ht, wd):
