@@ -5,5 +5,6 @@
     <orderEntry type="jdk" jdkName="Python 3.11" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="module" module-name="Project2022" />
+    <orderEntry type="module" module-name="MAE3403" />
   </component>
 </module>

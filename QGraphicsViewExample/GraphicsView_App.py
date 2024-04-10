@@ -8,7 +8,7 @@ import sys
 #endregion
 
 #region class definitions
-class LinkItem(qtw.QGraphicsItem):
+class RigidLink(qtw.QGraphicsItem):
     def __init__(self, stX, stY, enX, enY, radius=10, parent = None, pen=None, brush=None):
         """
         This is a custom class for drawing a rigid link.  The paint function executes everytime the scene
@@ -146,7 +146,6 @@ class RigidPivotPoint(qtw.QGraphicsItem):
         painter.setBrush(hatchbrush)
         support = qtc.QRectF(x5,y4,self.width*2, self.height)
         painter.drawRect(support)
-
 
 class ArcItem(qtw.QGraphicsItem):
     def __init__(self, rect, start_angle, span_angle, parent=None, pen=None):
@@ -292,19 +291,19 @@ class MainWindow(Ui_Form, qtw.QWidget):
         brush = qtg.QBrush()
         brush.setStyle(qtc.Qt.BDiagPattern)
         #self.drawRigidSurface(5,5,45,15, pen=self.penMed,brush=brush)
-        self.link1=self.drawLinkage(5,-5,5,45,10, self.penLink)
-        self.link2=self.drawLinkage(5,-5,-55,-60,10, self.penLink)
+        self.link1=self.drawLinkage(5,-5,55,-60,10, self.penLink)
+        #self.link2=self.drawLinkage(5,-5,-55,-60,10, self.penLink)
         self.pivot = self.drawPivot(5,-5,10,20)
         #draw some lines
-        self.line1 = self.drawALine(-50, -50, -50, 50)
-        self.line1.setPen(self.penThick)
-        self.line2 = self.drawALine(-50, -50, 50, -50)
-        self.line2.setPen(self.penThick)
+        #self.line1 = self.drawALine(-50, -50, -50, 50)
+        #self.line1.setPen(self.penThick)
+        #self.line2 = self.drawALine(-50, -50, 50, -50)
+        #self.line2.setPen(self.penThick)
 
-        self.drawACircle(-50,-50,5, pen=self.penMed, brush=self.brushFill)
-        self.drawASquare(-50,50,10, pen=self.penMed, brush=self.brushFill)
-        self.drawATriangle(50,-50,10, pen=self.penMed, brush=self.brushHatch)
-        self.drawAnArrow(0,0,10,-20,pen=self.penMed, brush=self.brushFill)
+        #self.drawACircle(-50,-50,5, pen=self.penMed, brush=self.brushFill)
+        #self.drawASquare(-50,50,10, pen=self.penMed, brush=self.brushFill)
+        #self.drawATriangle(50,-50,10, pen=self.penMed, brush=self.brushHatch)
+        #self.drawAnArrow(0,0,10,-20,pen=self.penMed, brush=self.brushFill)
 
     def drawAGrid(self, DeltaX=10, DeltaY=10, Height=200, Width=200, CenterX=0, CenterY=0, Pen=None, Brush=None, SubGrid=None):
         """
@@ -437,7 +436,7 @@ class MainWindow(Ui_Form, qtw.QWidget):
         self.drawARectangle(left, top, Width, Height, pen=penOutline, brush=brush)
 
     def drawLinkage(self, stX, stY, enX, enY, radius=10, pen=None):
-        lin1=LinkItem(stX,stY,enX, enY, radius, pen=pen, brush=self.brushGrid)
+        lin1=RigidLink(stX, stY, enX, enY, radius, pen=pen, brush=self.brushGrid)
         self.scene.addItem(lin1)
         return lin1
     def drawPivot(self, x, y, ht, wd):
