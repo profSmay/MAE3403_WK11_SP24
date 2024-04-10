@@ -99,10 +99,12 @@ class RigidLink(qtw.QGraphicsItem):
         painter.drawEllipse(pivotEnd)
 
 class RigidPivotPoint(qtw.QGraphicsItem):
-    def __init__(self, ptX, ptY, pivotHeight, pivotWidth, parent=None):
+    def __init__(self, ptX, ptY, pivotHeight, pivotWidth, parent=None, pen=None, brush=None):
         super().__init__(parent)
         self.x = ptX
         self.y = ptY
+        self.pen = pen
+        self.brush = brush
         self.height = pivotHeight
         self.width = pivotWidth
         self.radius = min(self.height, self.width) / 4
@@ -134,7 +136,12 @@ class RigidPivotPoint(qtw.QGraphicsItem):
         y4=self.y+self.height
         path.lineTo(x4,y4)
         #path.arcTo(pivotRect,ang*180/math.pi, 90)
+        if self.pen is not None:
+            painter.setPen(self.pen)  # Red color pen
+        if self.brush is not None:
+            painter.setBrush(self.brush)
         painter.drawPath(path)
+
         pivotPtRect=qtc.QRectF(self.x-radius/4, self.y-radius/4, radius/2,radius/2)
         painter.drawEllipse(pivotPtRect)
         x5=self.x-self.width
@@ -229,6 +236,8 @@ class MainWindow(Ui_Form, qtw.QWidget):
         self.brushHatch.setStyle(qtc.Qt.DiagCrossPattern)
         #a brush for the background of my grid
         self.brushGrid = qtg.QBrush(qtg.QColor.fromHsv(87, 98, 245, 128))
+        self.brushLink = qtg.QBrush(qtg.QColor.fromHsv(35,255,255, 64))
+        self.brushPivot = qtg.QBrush(qtg.QColor.fromHsv(0,0,128, 255))
 
     def mouseMoveEvent(self, a0: qtg.QMouseEvent):
         w=app.widgetAt(a0.globalPos())
@@ -293,11 +302,12 @@ class MainWindow(Ui_Form, qtw.QWidget):
         brush = qtg.QBrush()
         brush.setStyle(qtc.Qt.BDiagPattern)
         #self.drawRigidSurface(5,5,45,15, pen=self.penMed,brush=brush)
+        self.pivot = self.drawPivot(-100,-5,10,20)
+        self.pivot1 = self.drawPivot(100,-10,10,20)
         self.link1=self.drawLinkage(-100,-5,55,-60,5, self.penLink)
         self.link2=self.drawLinkage(100,-10,55,-60,5, self.penLink)
         #self.link2=self.drawLinkage(5,-5,-55,-60,10, self.penLink)
-        self.pivot = self.drawPivot(-100,-5,10,20)
-        self.pivot1 = self.drawPivot(100,-10,10,20)
+
         #draw some lines
         #self.line1 = self.drawALine(-50, -50, -50, 50)
         #self.line1.setPen(self.penThick)
@@ -440,11 +450,11 @@ class MainWindow(Ui_Form, qtw.QWidget):
         self.drawARectangle(left, top, Width, Height, pen=penOutline, brush=brush)
 
     def drawLinkage(self, stX, stY, enX, enY, radius=10, pen=None):
-        lin1=RigidLink(stX, stY, enX, enY, radius, pen=pen, brush=self.brushGrid)
+        lin1=RigidLink(stX, stY, enX, enY, radius, pen=pen, brush=self.brushLink)
         self.scene.addItem(lin1)
         return lin1
     def drawPivot(self, x, y, ht, wd):
-        pivot = RigidPivotPoint(x,y,ht,wd)
+        pivot = RigidPivotPoint(x,y,ht,wd, brush=self.brushPivot)
         self.scene.addItem(pivot)
         return pivot
 
