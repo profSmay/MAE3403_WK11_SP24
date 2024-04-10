@@ -260,11 +260,22 @@ class MainWindow(Ui_Form, qtw.QWidget):
                 self.setWindowTitle(strScreen+strScene)
                 if self.mouseDown:
                     scenePos = event.scenePos()
-                    self.link1.endX=scenePos.x()
-                    self.link1.endY=scenePos.y()
-                    self.link1.update()
-                    self.link2.endX=scenePos.x()
-                    self.link2.endY=scenePos.y()
+                    x=scenePos.x()
+                    y=scenePos.y()
+                    angle=0
+                    if (x==self.link1.startX):
+                        angle = math.pi/2 if y<= self.link1.startY else math.pi*3.0/2.0
+                    else:
+                        angle = math.atan(-(y-self.link1.startY)/(x-self.link1.startX))
+                        angle += math.pi  if x<self.link1.startX else 0
+                    len=self.link1.linkLength()
+                    self.link1.endX=self.link1.startX+math.cos(angle)*len
+                    self.link1.endY=self.link1.startY-math.sin(angle)*len
+                    #self.link1.endX=scenePos.x()
+                    #self.link1.endY=scenePos.y()
+                    #self.link1.update()
+                    self.link3.startX=self.link1.endX
+                    self.link3.startY=self.link1.endY
                     self.scene.update()
                     # centerX = self.tmpCircle.rect().center().x()
                     # centerY = self.tmpCircle.rect().center().y()
@@ -304,8 +315,9 @@ class MainWindow(Ui_Form, qtw.QWidget):
         #self.drawRigidSurface(5,5,45,15, pen=self.penMed,brush=brush)
         self.pivot = self.drawPivot(-100,-5,10,20)
         self.pivot1 = self.drawPivot(100,-10,10,20)
-        self.link1=self.drawLinkage(-100,-5,55,-60,5, self.penLink)
-        self.link2=self.drawLinkage(100,-10,55,-60,5, self.penLink)
+        self.link1=self.drawLinkage(-100,-5,-50,-60,5)
+        self.link2=self.drawLinkage(100,-10,55,-60,5)
+        self.link3=self.drawLinkage(-50,-60, 55, -60, 5)
         #self.link2=self.drawLinkage(5,-5,-55,-60,10, self.penLink)
 
         #draw some lines
@@ -450,6 +462,7 @@ class MainWindow(Ui_Form, qtw.QWidget):
         self.drawARectangle(left, top, Width, Height, pen=penOutline, brush=brush)
 
     def drawLinkage(self, stX, stY, enX, enY, radius=10, pen=None):
+        if pen is None: pen=self.penLink
         lin1=RigidLink(stX, stY, enX, enY, radius, pen=pen, brush=self.brushLink)
         self.scene.addItem(lin1)
         return lin1
