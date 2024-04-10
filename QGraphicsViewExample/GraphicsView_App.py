@@ -5,6 +5,9 @@ import PyQt5.QtCore as qtc
 import PyQt5.QtWidgets as qtw
 import math
 import sys
+import numpy as np
+import scipy as sp
+from scipy import optimize
 #endregion
 
 #region class definitions
@@ -259,23 +262,41 @@ class MainWindow(Ui_Form, qtw.QWidget):
                 strScene=":  scene x = {}, scene y = {}".format(scenePos.x(), scenePos.y())
                 self.setWindowTitle(strScreen+strScene)
                 if self.mouseDown:
+                    l1=self.link1.linkLength()
+                    l2=self.link2.linkLength()
+                    l3=self.link3.linkLength()
+
                     scenePos = event.scenePos()
                     x=scenePos.x()
                     y=scenePos.y()
-                    angle=0
+                    angle1=0
                     if (x==self.link1.startX):
-                        angle = math.pi/2 if y<= self.link1.startY else math.pi*3.0/2.0
+                        angle1 = math.pi/2 if y<= self.link1.startY else math.pi*3.0/2.0
                     else:
-                        angle = math.atan(-(y-self.link1.startY)/(x-self.link1.startX))
-                        angle += math.pi  if x<self.link1.startX else 0
-                    len=self.link1.linkLength()
-                    self.link1.endX=self.link1.startX+math.cos(angle)*len
-                    self.link1.endY=self.link1.startY-math.sin(angle)*len
+                        angle1 = math.atan(-(y-self.link1.startY)/(x-self.link1.startX))
+                        angle1 += math.pi  if x<self.link1.startX else 0
+
+                    self.link1.endX=self.link1.startX+math.cos(angle1)*l1
+                    self.link1.endY=self.link1.startY-math.sin(angle1)*l1
+                    x1=self.link1.endX
+                    y1=self.link1.endY
+                    len=l2
+                    def fn1(angle2):
+                        x2=self.link3.startX+l3*math.cos(angle2)
+                        y2=self.link3.startY-l3*math.sin(angle2)
+                        len = math.sqrt(math.pow(x2-x1,2)+math.pow(y2-y1,2))
+                        return l2-len
+                    angle2=optimize.fsolve(fn1,[angle1])[0]
                     #self.link1.endX=scenePos.x()
                     #self.link1.endY=scenePos.y()
                     #self.link1.update()
-                    self.link3.startX=self.link1.endX
-                    self.link3.startY=self.link1.endY
+                    self.link3.endX = self.link3.startX+l3*math.cos(angle2)
+                    self.link3.endY = self.link3.startY-l3*math.sin(angle2)
+                    self.link2.startX=self.link1.endX
+                    self.link2.startY=self.link1.endY
+                    self.link2.endX=self.link3.endX
+                    self.link2.endY=self.link3.endY
+                    len2=self.link2.linkLength()
                     self.scene.update()
                     # centerX = self.tmpCircle.rect().center().x()
                     # centerY = self.tmpCircle.rect().center().y()
@@ -313,11 +334,11 @@ class MainWindow(Ui_Form, qtw.QWidget):
         brush = qtg.QBrush()
         brush.setStyle(qtc.Qt.BDiagPattern)
         #self.drawRigidSurface(5,5,45,15, pen=self.penMed,brush=brush)
-        self.pivot = self.drawPivot(-100,-5,10,20)
-        self.pivot1 = self.drawPivot(100,-10,10,20)
-        self.link1=self.drawLinkage(-100,-5,-50,-60,5)
-        self.link2=self.drawLinkage(100,-10,55,-60,5)
-        self.link3=self.drawLinkage(-50,-60, 55, -60, 5)
+        self.pivot = self.drawPivot(-100,0,10,20)
+        self.pivot1 = self.drawPivot(100,0,10,20)
+        self.link1=self.drawLinkage(-100,0,-100,-40,5)
+        self.link2=self.drawLinkage(-100,-40, 100, -80, 5)
+        self.link3=self.drawLinkage(100,0,100,-80,5)
         #self.link2=self.drawLinkage(5,-5,-55,-60,10, self.penLink)
 
         #draw some lines
