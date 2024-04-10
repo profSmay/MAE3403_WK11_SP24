@@ -8,6 +8,164 @@ import sys
 #endregion
 
 #region class definitions
+class LinkItem(qtw.QGraphicsItem):
+    def __init__(self, stX, stY, enX, enY, radius=10, parent = None, pen=None, brush=None):
+        """
+        This is a custom class for drawing a rigid link.  The paint function executes everytime the scene
+        which holds the link is updated.  The steps to making the link are:
+        1. Specify the start and end x,y coordinates of the link
+        2. Specify the radius (i.e., the width of the link)
+        3. Compute the length of the link
+        3. Compute the angle of the link relative to the x-axis
+        4. Compute the angle normal the angle of the length by adding pi/2
+        5. Compute the rectangle that will contain the link (i.e., its bounding box)
+        These steps are executed each time the paint function is invoked
+        :param stX:
+        :param stY:
+        :param enX:
+        :param enY:
+        :param radius:
+        :param parent:
+        :param pen:
+        :param brush:
+        """
+        super().__init__(parent)
+        #step 1
+        self.startX = stX
+        self.startY = stY
+        self.endX = enX
+        self.endY = enY
+        #step 2
+        self.radius = radius
+        #step 3
+        self.length=self.linkLength()
+        #step 4
+        self.angle = self.linkAngle()
+        #step 5
+        self.normAngle = self.angle+math.pi/2
+        #step 6
+        self.width=self.endX-self.startX+2*self.radius
+        self.height=self.endY-self.startY+2*self.radius
+        self.rect=qtc.QRectF(self.startX, self.startY, self.width, self.height)
+
+        self.pen=pen
+        self.brush=brush
+
+    def boundingRect(self):
+        return self.rect
+
+    def linkLength(self):
+        self.length = math.sqrt(math.pow(self.startX - self.endX, 2) + math.pow(self.startY - self.endY, 2))
+        return self.length
+
+    def linkAngle(self):
+        self.angle= math.acos((self.endX-self.startX)/self.linkLength())
+        self.angle *= -1 if (self.endY>self.startY) else 1
+        return self.angle
+
+    def paint(self, painter, option, widget=None):
+        """
+        This function creates a path painter the paints a semicircle around the start point (ccw), a straight line
+        offset from the main axis of the link, a semicircle around the end point (ccw), and a straight line offset from
+        the main axis.  It then assigns a pen and brush.  Finally, it draws a circle at the start and end points to
+        indicate the pivot points.
+        :param painter:
+        :param option:
+        :param widget:
+        :return:
+        """
+        path = qtg.QPainterPath()
+        len = self.linkLength()
+        angLink = self.linkAngle()*180/math.pi
+        perpAng = angLink+90
+        xOffset = self.radius*math.cos(perpAng*math.pi/180)
+        yOffset = -self.radius*math.sin(perpAng*math.pi/180)
+        rectStart = qtc.QRectF(self.startX-self.radius, self.startY-self.radius, 2*self.radius, 2*self.radius)
+        rectEnd = qtc.QRectF(self.endX-self.radius, self.endY-self.radius, 2*self.radius, 2*self.radius)
+        path.arcMoveTo(rectStart, perpAng)
+        path.arcTo(rectStart, perpAng, 180)
+        path.lineTo(self.endX-xOffset, self.endY-yOffset)
+        path.arcMoveTo(rectEnd, perpAng+180)
+        path.arcTo(rectEnd, perpAng+180, 180)
+        path.lineTo(self.startX+xOffset, self.startY+yOffset)
+        if self.pen is not None:
+            painter.setPen(self.pen)  # Red color pen
+        if self.brush is not None:
+            painter.setBrush(self.brush)
+        painter.drawPath(path)
+        pivotStart=qtc.QRectF(self.startX-self.radius/6, self.startY-self.radius/6, self.radius/3, self.radius/3)
+        pivotEnd=qtc.QRectF(self.endX-self.radius/6, self.endY-self.radius/6, self.radius/3, self.radius/3)
+        painter.drawEllipse(pivotStart)
+        painter.drawEllipse(pivotEnd)
+
+class RigidPivotPoint(qtw.QGraphicsItem):
+    def __init__(self, ptX, ptY, pivotHeight, pivotWidth, parent=None):
+        super().__init__(parent)
+        self.x = ptX
+        self.y = ptY
+        self.height = pivotHeight
+        self.width = pivotWidth
+        self.radius = min(self.height, self.width) / 4
+        self.rect = qtc.QRectF(self.x - self.width / 2, self.y - self.radius, self.width, self.height + self.radius)
+
+    def boundingRect(self):
+        return self.rect
+
+    def paint(self, painter, option, widget=None):
+        path = qtg.QPainterPath()
+        radius = min(self.height,self.width)/4
+        rect = qtc.QRectF(self.x-self.width/2, self.y-radius, self.width,self.height+radius)
+        H=math.sqrt(math.pow(self.width/2,2)+math.pow(self.height,2))
+        phi=math.asin(radius/H)
+        theta=math.asin(self.height/H)
+        ang=math.pi-phi-theta
+        l=H*math.cos(phi)
+        x1=self.x+self.width/2
+        y1=self.y+self.height
+        path.moveTo(x1,y1)
+        x2=l*math.cos(ang)
+        y2=l*math.sin(ang)
+        path.lineTo(x1+x2, y1-y2)
+        pivotRect=qtc.QRectF(self.x-radius, self.y-radius, 2*radius, 2*radius)
+        stAng=math.pi/2-phi-theta
+        spanAng=math.pi-2*stAng
+        path.arcTo(pivotRect,stAng*180/math.pi, spanAng*180/math.pi)
+        x4=self.x-self.width/2
+        y4=self.y+self.height
+        path.lineTo(x4,y4)
+        #path.arcTo(pivotRect,ang*180/math.pi, 90)
+        painter.drawPath(path)
+        pivotPtRect=qtc.QRectF(self.x-radius/4, self.y-radius/4, radius/2,radius/2)
+        painter.drawEllipse(pivotPtRect)
+        x5=self.x-self.width
+        x6=self.x+self.width
+        painter.drawLine(x5,y4,x6,y4)
+        penOutline = qtg.QPen(qtc.Qt.NoPen)
+        hatchbrush = qtg.QBrush(qtc.Qt.BDiagPattern)
+        painter.setPen(penOutline)
+        painter.setBrush(hatchbrush)
+        support = qtc.QRectF(x5,y4,self.width*2, self.height)
+        painter.drawRect(support)
+
+
+class ArcItem(qtw.QGraphicsItem):
+    def __init__(self, rect, start_angle, span_angle, parent=None, pen=None):
+        super().__init__(parent)
+        self.rect = rect
+        self.start_angle = start_angle
+        self.span_angle = span_angle
+        self.pen = pen if pen is not None else qtg.QPen()
+
+    def boundingRect(self):
+        return self.rect
+
+    def paint(self, painter, option, widget=None):
+        path = qtg.QPainterPath()
+        path.arcMoveTo(self.rect,self.start_angle)
+        path.arcTo(self.rect, self.start_angle,self.span_angle)
+        painter.setPen(self.pen)  # Red color pen
+        painter.drawPath(path)
+
 class MainWindow(Ui_Form, qtw.QWidget):
     def __init__(self):
         """
@@ -56,10 +214,13 @@ class MainWindow(Ui_Form, qtw.QWidget):
         self.penMed = qtg.QPen(qtc.Qt.darkBlue)
         self.penMed.setStyle(qtc.Qt.SolidLine)
         self.penMed.setWidth(2)
+        #a this orange pen
+        self.penLink = qtg.QPen(qtg.QColor("orange"))
+        self.penLink.setWidth(1)
         #a pen for the grid lines
         self.penGridLines = qtg.QPen()
         self.penGridLines.setWidth(1)
-        self.penGridLines.setColor(qtg.QColor.fromHsv(197, 144, 228, 255))
+        self.penGridLines.setColor(qtg.QColor.fromHsv(197, 144, 228, 128))
 
         #now make some brushes
         #build a brush for filling with solid red
@@ -68,7 +229,7 @@ class MainWindow(Ui_Form, qtw.QWidget):
         self.brushHatch = qtg.QBrush()
         self.brushHatch.setStyle(qtc.Qt.DiagCrossPattern)
         #a brush for the background of my grid
-        self.brushGrid = qtg.QBrush(qtg.QColor.fromHsv(87, 98, 245, 255))
+        self.brushGrid = qtg.QBrush(qtg.QColor.fromHsv(87, 98, 245, 128))
 
     def mouseMoveEvent(self, a0: qtg.QMouseEvent):
         w=app.widgetAt(a0.globalPos())
@@ -91,12 +252,16 @@ class MainWindow(Ui_Form, qtw.QWidget):
                 self.setWindowTitle(strScreen+strScene)
                 if self.mouseDown:
                     scenePos = event.scenePos()
-                    centerX = self.tmpCircle.rect().center().x()
-                    centerY = self.tmpCircle.rect().center().y()
-                    radius = math.pow(centerX-scenePos.x(),2)+math.pow(centerY-scenePos.y(),2)
-                    radius = math.sqrt(radius)
-                    self.tmpCircle.setRect(centerX-radius, centerY-radius, 2*radius, 2*radius)
-                    self.tmpLn.setLine(centerX, centerY, scenePos.x(),scenePos.y())
+                    self.link1.endX=scenePos.x()
+                    self.link1.endY=scenePos.y()
+                    self.link1.update()
+                    self.scene.update()
+                    # centerX = self.tmpCircle.rect().center().x()
+                    # centerY = self.tmpCircle.rect().center().y()
+                    # radius = math.pow(centerX-scenePos.x(),2)+math.pow(centerY-scenePos.y(),2)
+                    # radius = math.sqrt(radius)
+                    # self.tmpCircle.setRect(centerX-radius, centerY-radius, 2*radius, 2*radius)
+                    # self.tmpLn.setLine(centerX, centerY, scenePos.x(),scenePos.y())
 
             if event.type() == qtc.QEvent.GraphicsSceneWheel:
                 if event.delta()>0:
@@ -105,13 +270,13 @@ class MainWindow(Ui_Form, qtw.QWidget):
                     self.spnd_Zoom.stepDown()
             if event.type() ==qtc.QEvent.GraphicsSceneMousePress:
                 if event.button() ==qtc.Qt.LeftButton:
-                    pos = event.screenPos()
-                    scenePos = event.scenePos()
-                    self.tmpCircle = self.drawACircle(scenePos.x(),scenePos.y(),1)
-                    self.tmpLn = self.drawALine(scenePos.x(), scenePos.y(), scenePos.x()+1, scenePos.y()+1)
-                    self.tmpCircle.setPen(self.penMed)
-                    self.tmpCircle.setBrush(self.brushGrid)
-                    self.tmpLn.setPen(self.penGridLines)
+                    # pos = event.screenPos()
+                    # scenePos = event.scenePos()
+                    # self.tmpCircle = self.drawACircle(scenePos.x(),scenePos.y(),1)
+                    # self.tmpLn = self.drawALine(scenePos.x(), scenePos.y(), scenePos.x()+1, scenePos.y()+1)
+                    # self.tmpCircle.setPen(self.penMed)
+                    # self.tmpCircle.setBrush(self.brushGrid)
+                    # self.tmpLn.setPen(self.penGridLines)
                     self.mouseDown = True
             if event.type() == qtc.QEvent.GraphicsSceneMouseRelease:
                 self.mouseDown = False
@@ -123,8 +288,13 @@ class MainWindow(Ui_Form, qtw.QWidget):
         self.scene.clear()
 
         #draw a grid
-        self.drawAGrid(DeltaX=10, DeltaY=10, Height=200, Width=200, Pen=self.penGridLines, Brush=self.brushGrid)
-
+        self.drawAGrid(DeltaX=10, DeltaY=10, Height=400, Width=400, Pen=self.penGridLines, Brush=self.brushGrid)
+        brush = qtg.QBrush()
+        brush.setStyle(qtc.Qt.BDiagPattern)
+        #self.drawRigidSurface(5,5,45,15, pen=self.penMed,brush=brush)
+        self.link1=self.drawLinkage(5,-5,5,45,10, self.penLink)
+        self.link2=self.drawLinkage(5,-5,-55,-60,10, self.penLink)
+        self.pivot = self.drawPivot(5,-5,10,20)
         #draw some lines
         self.line1 = self.drawALine(-50, -50, -50, 50)
         self.line1.setPen(self.penThick)
@@ -165,6 +335,7 @@ class MainWindow(Ui_Form, qtw.QWidget):
             rect = self.drawARectangle(left, top, width, height)
             rect.setBrush(Brush)
             rect.setPen(pen)
+
         # draw the vertical grid lines
         x = left
         while x <= right:
@@ -178,12 +349,21 @@ class MainWindow(Ui_Form, qtw.QWidget):
             lHor.setPen(pen)
             y += Dy
 
-    def drawARectangle(self, leftX, topY, widthX, heightY):
+    def drawARectangle(self, leftX, topY, widthX, heightY, pen=None, brush=None):
+
         rect = qtw.QGraphicsRectItem(leftX,topY,widthX,heightY)
+        if brush is not None:
+            rect.setBrush(brush)
+        if pen is not None:
+            rect.setPen(pen)
+
         self.scene.addItem(rect)
         return rect
-    def drawALine(self, stX, stY, enX, enY):
-        line = qtw.QGraphicsLineItem(stX, stY, enX, enY)
+
+    def drawALine(self, stX, stY, enX, enY, pen=None):
+        if pen is None: pen= self.penMed
+        line = qtw.QGraphicsLineItem(stX,stY, enX,enY)
+        line.setPen(pen)
         self.scene.addItem(line)
         return line
 
@@ -237,6 +417,33 @@ class MainWindow(Ui_Form, qtw.QWidget):
         angleDeg=180.0/math.pi*math.atan((endY-startY)/(endX-startX))
         self.scene.addItem(line)
         self.drawATriangle(endX, endY, 5, angleDeg=angleDeg,pen=pen, brush=brush)
+
+    def drawRigidSurface(self, centerX, centerY, Width=10, Height=3, pen=None, brush=None):
+        """
+        This should draw a figure that has a rectangle with the top border an solid line and the rectangle filled
+        with a hatch pattern
+        :param centerX:
+        :param centerY:
+        :param Width:
+        :param Height:
+        :return:
+        """
+        top=centerY
+        left=centerX-Width/2
+        right = centerX+Width/2
+        self.drawALine(centerX-Width/2, centerY, centerX+Width/2, centerY, pen=pen)
+        penOutline = qtg.QPen(qtc.Qt.NoPen)
+
+        self.drawARectangle(left, top, Width, Height, pen=penOutline, brush=brush)
+
+    def drawLinkage(self, stX, stY, enX, enY, radius=10, pen=None):
+        lin1=LinkItem(stX,stY,enX, enY, radius, pen=pen, brush=self.brushGrid)
+        self.scene.addItem(lin1)
+        return lin1
+    def drawPivot(self, x, y, ht, wd):
+        pivot = RigidPivotPoint(x,y,ht,wd)
+        self.scene.addItem(pivot)
+        return pivot
 
     def pickAColor(self):
         cdb=qtw.QColorDialog(self)
