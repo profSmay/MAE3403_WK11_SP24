@@ -113,7 +113,7 @@ class RigidPivotPoint(qtw.QGraphicsItem):
 
     def paint(self, painter, option, widget=None):
         path = qtg.QPainterPath()
-        radius = min(self.height,self.width)/4
+        radius = min(self.height,self.width)/2
         rect = qtc.QRectF(self.x-self.width/2, self.y-radius, self.width,self.height+radius)
         H=math.sqrt(math.pow(self.width/2,2)+math.pow(self.height,2))
         phi=math.asin(radius/H)
@@ -254,6 +254,8 @@ class MainWindow(Ui_Form, qtw.QWidget):
                     self.link1.endX=scenePos.x()
                     self.link1.endY=scenePos.y()
                     self.link1.update()
+                    self.link2.endX=scenePos.x()
+                    self.link2.endY=scenePos.y()
                     self.scene.update()
                     # centerX = self.tmpCircle.rect().center().x()
                     # centerY = self.tmpCircle.rect().center().y()
@@ -291,9 +293,11 @@ class MainWindow(Ui_Form, qtw.QWidget):
         brush = qtg.QBrush()
         brush.setStyle(qtc.Qt.BDiagPattern)
         #self.drawRigidSurface(5,5,45,15, pen=self.penMed,brush=brush)
-        self.link1=self.drawLinkage(5,-5,55,-60,10, self.penLink)
+        self.link1=self.drawLinkage(-100,-5,55,-60,5, self.penLink)
+        self.link2=self.drawLinkage(100,-10,55,-60,5, self.penLink)
         #self.link2=self.drawLinkage(5,-5,-55,-60,10, self.penLink)
-        self.pivot = self.drawPivot(5,-5,10,20)
+        self.pivot = self.drawPivot(-100,-5,10,20)
+        self.pivot1 = self.drawPivot(100,-10,10,20)
         #draw some lines
         #self.line1 = self.drawALine(-50, -50, -50, 50)
         #self.line1.setPen(self.penThick)
