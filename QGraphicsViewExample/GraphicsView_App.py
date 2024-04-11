@@ -111,7 +111,7 @@ class RigidLink(qtw.QGraphicsItem):
         painter.drawEllipse(pivotEnd)
 
 class RigidPivotPoint(qtw.QGraphicsItem):
-    def __init__(self, ptX, ptY, pivotHeight, pivotWidth, parent=None, pen=None, brush=None):
+    def __init__(self, ptX, ptY, pivotHeight, pivotWidth, parent=None, pen=None, brush=None, rotation=0):
         super().__init__(parent)
         self.x = ptX
         self.y = ptY
@@ -121,9 +121,13 @@ class RigidPivotPoint(qtw.QGraphicsItem):
         self.width = pivotWidth
         self.radius = min(self.height, self.width) / 4
         self.rect = qtc.QRectF(self.x - self.width / 2, self.y - self.radius, self.width, self.height + self.radius)
+        self.rotationAngle = rotation
 
     def boundingRect(self):
         return self.rect
+    def rotate(self, angle):
+        self.rotationAngle=angle
+
 
     def paint(self, painter, option, widget=None):
         path = qtg.QPainterPath()
@@ -165,6 +169,7 @@ class RigidPivotPoint(qtw.QGraphicsItem):
         painter.setBrush(hatchbrush)
         support = qtc.QRectF(x5,y4,self.width*2, self.height)
         painter.drawRect(support)
+        self.setRotation(self.rotationAngle)
 
 class ArcItem(qtw.QGraphicsItem):
     def __init__(self, rect, start_angle, span_angle, parent=None, pen=None):
@@ -351,7 +356,11 @@ class MainWindow(Ui_Form, qtw.QWidget):
         brush.setStyle(qtc.Qt.BDiagPattern)
         #self.drawRigidSurface(5,5,45,15, pen=self.penMed,brush=brush)
         self.pivot0 = self.drawPivot(-100, 0, 10, 20)
+        self.pivot0.setTransformOriginPoint(qtc.QPointF(self.pivot0.x, self.pivot0.y))
+        self.pivot0.rotate(90)
         self.pivot1 = self.drawPivot(60,-30,10,20)
+        self.pivot1.setTransformOriginPoint(qtc.QPointF(self.pivot1.x, self.pivot1.y))
+        self.pivot1.rotate(-90)
         self.link0=self.drawLinkage(self.pivot0.x, self.pivot0.y, self.pivot1.x, self.pivot1.y, radius=5, pen = self.penGridLines, brush = self.brushGrid)
         self.link1=self.drawLinkage(-100,0,-100,-60,5)
         self.link2=self.drawLinkage(-100,-60, 100, -80, 5)
