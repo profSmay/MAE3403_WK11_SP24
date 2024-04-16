@@ -12,17 +12,22 @@ from scipy import optimize
 
 #region class definitions
 class RigidLink(qtw.QGraphicsItem):
-    def __init__(self, stX, stY, enX, enY, radius=10, parent = None, pen=None, brush=None):
+    def __init__(self, stX, stY, enX, enY, radius=10, parent=None, pen=None, brush=None, name='RigidLink' ):
         """
         This is a custom class for drawing a rigid link.  The paint function executes everytime the scene
         which holds the link is updated.  The steps to making the link are:
-        1. Specify the start and end x,y coordinates of the link
-        2. Specify the radius (i.e., the width of the link)
-        3. Compute the length of the link
-        3. Compute the angle of the link relative to the x-axis
-        4. Compute the angle normal the angle of the length by adding pi/2
-        5. Compute the rectangle that will contain the link (i.e., its bounding box)
-        These steps are executed each time the paint function is invoked
+        1. Specify the pen, brush, start and end x,y coordinates of the link and radius by unpacking arguments
+        2. Compute the length and angle of the link (also sets self.DX, self.DY)
+        3. Compute the rectangle that will contain the link (i.e., its bounding box)
+        4. Setup the transformation that will rotate and then translate the link
+
+        *Note:  The paint function is called each time the scene changes.  I draw a link aligned with the x-axis first
+        with the start point at 0,0 and end point at length, 0. Then, the path painter draws the centerline and the
+        start and end pivot points, then the start semicircle, a line to the end semicircle, the end semicircle,
+        and a line back to the start semicircle.  Finally, the link is rotated about 0,0 and then translated to startX,
+        startY.  In this way, the bounding rectangle gets transformed and this helps with detecting the item in the
+        graphics view when the mouse hovers.
+
         :param stX:
         :param stY:
         :param enX:
@@ -33,37 +38,47 @@ class RigidLink(qtw.QGraphicsItem):
         :param brush:
         """
         super().__init__(parent)
+
         #step 1
+        self.pen = pen
+        self.brush = brush
+        self.name = name
         self.startX = stX
         self.startY = stY
         self.endX = enX
         self.endY = enY
-        #step 2
         self.radius = radius
-        #step 3
-        self.length=self.linkLength()
-        #step 4
+        #step 2
         self.angle = self.linkAngle()
-        #step 5
-        self.normAngle = self.angle+math.pi/2
-        #step 6
-        self.width=self.endX-self.startX+2*self.radius
-        self.height=self.endY-self.startY+2*self.radius
-        self.rect=qtc.QRectF(self.startX, self.startY, self.width, self.height)
-
-        self.pen=pen
-        self.brush=brush
+        #step 3
+        self.rect=qtc.QRectF(-self.radius, -self.radius,self.length+self.radius, self.radius )
+        #step 4 setup transform
+        self.transform = qtg.QTransform()
+        self.transform.reset()
 
     def boundingRect(self):
-        return self.rect
+        boundingRect = self.transform.mapRect(self.rect)
+        return boundingRect
+
+    def deltaY(self):
+        self.DY=self.endY-self.startY
+        return self.DY
+
+    def deltaX(self):
+        self.DX=self.endX-self.startX
+        return self.DX
 
     def linkLength(self):
-        self.length = math.sqrt(math.pow(self.startX - self.endX, 2) + math.pow(self.startY - self.endY, 2))
+        self.length = math.sqrt(math.pow(self.deltaX(), 2) + math.pow(self.deltaY(), 2))
         return self.length
 
     def linkAngle(self):
-        self.angle= math.acos((self.endX-self.startX)/self.linkLength())
-        self.angle *= -1 if (self.endY>self.startY) else 1
+        self.linkLength()
+        if self.length == 0.0:
+            self.angle=0
+        else:
+            self.angle= math.acos(self.DX/self.length)
+            self.angle *= -1 if (self.DY > 0) else 1
         return self.angle
 
     def paint(self, painter, option, widget=None):
@@ -77,41 +92,63 @@ class RigidLink(qtw.QGraphicsItem):
         :param widget:
         :return:
         """
+        #instantiate a QPainterPath object
         path = qtg.QPainterPath()
+        # compute linkLength from startX, startY, endX, endY
         len = self.linkLength()
+        # compute the angle of the link from deltaY & deltaX
         angLink = self.linkAngle()*180/math.pi
-        perpAng = angLink+90
-        xOffset = self.radius*math.cos(perpAng*math.pi/180)
-        yOffset = -self.radius*math.sin(perpAng*math.pi/180)
-        rectStart = qtc.QRectF(self.startX-self.radius, self.startY-self.radius, 2*self.radius, 2*self.radius)
-        rectEnd = qtc.QRectF(self.endX-self.radius, self.endY-self.radius, 2*self.radius, 2*self.radius)
+
+        #define bounding rectangles for the radiused ends of the link
+        rectSt = qtc.QRectF(-self.radius, -self.radius, 2*self.radius, 2*self.radius)
+        rectEn = qtc.QRectF(self.length-self.radius, -self.radius, 2*self.radius, 2*self.radius)
+
+        #draw a center line
         centerLinePen= qtg.QPen()
         centerLinePen.setStyle(qtc.Qt.DashDotLine)
         r,g,b,a=self.pen.color().getRgb()
         centerLinePen.setColor(qtg.QColor(r,g,b,128))
         centerLinePen.setWidth(1)
-        p1=qtc.QPointF(self.startX, self.startY)
-        p2=qtc.QPointF(self.endX, self.endY)
+        p1=qtc.QPointF(0,0)
+        p2=qtc.QPointF(len,0)
         painter.setPen(centerLinePen)
         painter.drawLine(p1,p2)
-        path.arcMoveTo(rectStart, perpAng)
-        path.arcTo(rectStart, perpAng, 180)
-        path.lineTo(self.endX-xOffset, self.endY-yOffset)
-        path.arcMoveTo(rectEnd, perpAng+180)
-        path.arcTo(rectEnd, perpAng+180, 180)
-        path.lineTo(self.startX+xOffset, self.startY+yOffset)
+
+        path.arcMoveTo(rectSt,90)
+        path.arcTo(rectSt, 90,180)
+        path.lineTo(self.length,self.radius)
+        path.arcMoveTo(rectEn, 270)
+        path.arcTo(rectEn, 270, 180)
+        path.lineTo(0, -self.radius)
         if self.pen is not None:
             painter.setPen(self.pen)  # Red color pen
         if self.brush is not None:
             painter.setBrush(self.brush)
         painter.drawPath(path)
-        pivotStart=qtc.QRectF(self.startX-self.radius/6, self.startY-self.radius/6, self.radius/3, self.radius/3)
-        pivotEnd=qtc.QRectF(self.endX-self.radius/6, self.endY-self.radius/6, self.radius/3, self.radius/3)
+        #draw some circles at the end points
+        pivotStart=qtc.QRectF(-self.radius/6, -self.radius/6, self.radius/3, self.radius/3)
+        pivotEnd=qtc.QRectF(self.length-self.radius/6, -self.radius/6, self.radius/3, self.radius/3)
         painter.drawEllipse(pivotStart)
         painter.drawEllipse(pivotEnd)
+        #redefine the bounding rectangle
+        self.rect=qtc.QRectF(-self.radius,-self.radius, self.length+2*self.radius,2*self.radius)
+        #Now perform transformations on the object.  Note: transformations are by matrix multiplication [newPt]=[T][R][oldPt]
+        #in 2D [R] is the 2x2 rotation matrix.  Hence [R][oldPt] is (2x2)*(2x1)=(2x1)=[rotatedPt]
+        #[T] is the 2x2 translation matrix.  Hence [T][rotatedPt] = [newPt]
+        self.transform.reset()
+        self.transform.translate(self.startX, self.startY)
+        self.transform.rotate(-angLink)
+        self.setTransform(self.transform)
+        self.transform.reset()
+        stTT=self.name+"\nstart: ({:0.3f}, {:0.3f})\nend:({:0.3f},{:0.3f})\nlength: {:0.3f}\nangle: {:0.3f}".format(self.startX, self.startY, self.endX, self.endY, self.length, self.angle*180/math.pi)
+        self.setToolTip(stTT)
+        # brPen=qtg.QPen()
+        # brPen.setWidth(0)
+        # painter.setPen(brPen)
+        # painter.drawRect(self.boundingRect())
 
 class RigidPivotPoint(qtw.QGraphicsItem):
-    def __init__(self, ptX, ptY, pivotHeight, pivotWidth, parent=None, pen=None, brush=None, rotation=0):
+    def __init__(self, ptX, ptY, pivotHeight, pivotWidth, parent=None, pen=None, brush=None, rotation=0, name='RigidPivotPoint'):
         super().__init__(parent)
         self.x = ptX
         self.y = ptY
@@ -122,34 +159,40 @@ class RigidPivotPoint(qtw.QGraphicsItem):
         self.radius = min(self.height, self.width) / 4
         self.rect = qtc.QRectF(self.x - self.width / 2, self.y - self.radius, self.width, self.height + self.radius)
         self.rotationAngle = rotation
+        self.name = name
+        self.transformation = qtg.QTransform()
+        stTT = self.name +"\nx={:0.3f}, y={:0.3f}".format(self.x, self.y)
+        self.setToolTip(stTT)
 
     def boundingRect(self):
-        return self.rect
+        bounding_rect = self.transformation.mapRect(self.rect)
+        return bounding_rect
+
     def rotate(self, angle):
         self.rotationAngle=angle
-
 
     def paint(self, painter, option, widget=None):
         path = qtg.QPainterPath()
         radius = min(self.height,self.width)/2
-        rect = qtc.QRectF(self.x-self.width/2, self.y-radius, self.width,self.height+radius)
+
         H=math.sqrt(math.pow(self.width/2,2)+math.pow(self.height,2))
         phi=math.asin(radius/H)
         theta=math.asin(self.height/H)
         ang=math.pi-phi-theta
         l=H*math.cos(phi)
-        x1=self.x+self.width/2
-        y1=self.y+self.height
+
+        x1=self.width/2
+        y1=self.height
         path.moveTo(x1,y1)
         x2=l*math.cos(ang)
         y2=l*math.sin(ang)
         path.lineTo(x1+x2, y1-y2)
-        pivotRect=qtc.QRectF(self.x-radius, self.y-radius, 2*radius, 2*radius)
+        pivotRect=qtc.QRectF(-radius, -radius, 2*radius, 2*radius)
         stAng=math.pi/2-phi-theta
         spanAng=math.pi-2*stAng
         path.arcTo(pivotRect,stAng*180/math.pi, spanAng*180/math.pi)
-        x4=self.x-self.width/2
-        y4=self.y+self.height
+        x4=-self.width/2
+        y4=+self.height
         path.lineTo(x4,y4)
         #path.arcTo(pivotRect,ang*180/math.pi, 90)
         if self.pen is not None:
@@ -158,10 +201,10 @@ class RigidPivotPoint(qtw.QGraphicsItem):
             painter.setBrush(self.brush)
         painter.drawPath(path)
 
-        pivotPtRect=qtc.QRectF(self.x-radius/4, self.y-radius/4, radius/2,radius/2)
+        pivotPtRect=qtc.QRectF(-radius/4, -radius/4, radius/2,radius/2)
         painter.drawEllipse(pivotPtRect)
-        x5=self.x-self.width
-        x6=self.x+self.width
+        x5=-self.width
+        x6=+self.width
         painter.drawLine(x5,y4,x6,y4)
         penOutline = qtg.QPen(qtc.Qt.NoPen)
         hatchbrush = qtg.QBrush(qtc.Qt.BDiagPattern)
@@ -169,25 +212,18 @@ class RigidPivotPoint(qtw.QGraphicsItem):
         painter.setBrush(hatchbrush)
         support = qtc.QRectF(x5,y4,self.width*2, self.height)
         painter.drawRect(support)
-        self.setRotation(self.rotationAngle)
+        self.rect=qtc.QRectF(-self.width,-self.radius, self.width*2, self.height*2+self.radius)
+        self.transformation.reset()
+        self.transformation.translate(self.x, self.y)
+        self.transformation.rotate(self.rotationAngle)
+        self.setTransform(self.transformation)
 
-class ArcItem(qtw.QGraphicsItem):
-    def __init__(self, rect, start_angle, span_angle, parent=None, pen=None):
-        super().__init__(parent)
-        self.rect = rect
-        self.start_angle = start_angle
-        self.span_angle = span_angle
-        self.pen = pen if pen is not None else qtg.QPen()
+        self.transformation.reset()
+        # brPen=qtg.QPen()
+        # brPen.setWidth(0)
+        # painter.setPen(brPen)
+        # painter.drawRect(self.boundingRect())
 
-    def boundingRect(self):
-        return self.rect
-
-    def paint(self, painter, option, widget=None):
-        path = qtg.QPainterPath()
-        path.arcMoveTo(self.rect,self.start_angle)
-        path.arcTo(self.rect, self.start_angle,self.span_angle)
-        painter.setPen(self.pen)  # Red color pen
-        painter.drawPath(path)
 
 class MainWindow(Ui_Form, qtw.QWidget):
     def __init__(self):
@@ -209,7 +245,8 @@ class MainWindow(Ui_Form, qtw.QWidget):
 
         #draws a scene
         self.buildScene()
-
+        self.prevAlpha = self.link1.angle
+        self.prevBeta = self.link3.angle
         self.angle1=math.pi
         self.angle2=math.pi
 
@@ -301,13 +338,23 @@ class MainWindow(Ui_Form, qtw.QWidget):
                     self.link1.endY=self.link1.startY-math.sin(self.angle1)*l1
                     x1=self.link1.endX
                     y1=self.link1.endY
-                    len=l2
+                    self.lTest = l2
                     def fn1(angle2):
                         x2=self.link3.startX+l3*math.cos(angle2)
                         y2=self.link3.startY-l3*math.sin(angle2)
-                        len = math.sqrt(math.pow(x2-x1,2)+math.pow(y2-y1,2))
-                        return l2-len
-                    self.angle2=optimize.fsolve(fn1,[self.angle2])[0]
+                        self.lTest = math.sqrt(math.pow(x2-x1,2)+math.pow(y2-y1,2))
+                        return l2-self.lTest
+                    result = optimize.fsolve(fn1,[self.angle2])
+                    if abs(self.lTest-l2)>0.001:
+                        self.angle2 = self.prevBeta
+                        self.angle1 = self.prevAlpha
+                        self.link1.endX = self.link1.startX + math.cos(self.angle1) * l1
+                        self.link1.endY = self.link1.startY - math.sin(self.angle1) * l1
+                    else:
+                        self.angle2=result[0]
+                        self.prevAlpha=self.angle1
+                        self.prevBeta=self.angle2
+
                     #self.link1.endX=scenePos.x()
                     #self.link1.endY=scenePos.y()
                     #self.link1.update()
@@ -363,8 +410,8 @@ class MainWindow(Ui_Form, qtw.QWidget):
         self.pivot1.rotate(-90)
         self.link0=self.drawLinkage(self.pivot0.x, self.pivot0.y, self.pivot1.x, self.pivot1.y, radius=5, pen = self.penGridLines, brush = self.brushGrid)
         self.link1=self.drawLinkage(-100,0,-100,-60,5)
-        self.link2=self.drawLinkage(-100,-60, 100, -80, 5)
-        self.link3=self.drawLinkage(60,-30,100,-80,5)
+        self.link2=self.drawLinkage(-100,-60, 100, -150, 5)
+        self.link3=self.drawLinkage(60,-30,100,-150,5)
 
         #self.link2=self.drawLinkage(5,-5,-55,-60,10, self.penLink)
 
